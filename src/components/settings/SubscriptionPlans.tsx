@@ -42,25 +42,33 @@ const SubscriptionPlans: React.FC = () => {
   // Refresh user preferences when component mounts, after payment completion, and periodically
   useEffect(() => {
     const checkPreferences = async () => {
-      await refreshUserPreferences();
+      try {
+        await refreshUserPreferences();
+        // If preferences show pro and payment was completed, stop checking
+        if (userPreferences?.plan_tier === 'pro' && paymentCompleted) {
+          setPaymentCompleted(false);
+        }
+      } catch (error) {
+        console.error('Error refreshing preferences:', error);
+      }
     };
     
     checkPreferences();
     
-    // If payment was completed, check more frequently for a short period
+    // If payment was completed, check more frequently for a longer period
     if (paymentCompleted) {
-      const interval = setInterval(checkPreferences, 2000); // Check every 2 seconds
+      const interval = setInterval(checkPreferences, 3000); // Check every 3 seconds
       const timeout = setTimeout(() => {
         clearInterval(interval);
         setPaymentCompleted(false);
-      }, 30000); // Stop checking after 30 seconds
+      }, 60000); // Keep checking for 60 seconds
       
       return () => {
         clearInterval(interval);
         clearTimeout(timeout);
       };
     }
-  }, [paymentCompleted]);
+  }, [paymentCompleted, userPreferences?.plan_tier]);
   
   const plans = [
     {

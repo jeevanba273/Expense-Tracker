@@ -39,15 +39,17 @@ Deno.serve(async (req) => {
         const customerId = session.customer;
         const subscriptionId = session.subscription;
 
-        console.log('Checkout completed:', {
+        console.log('Webhook: Processing checkout.session.completed', {
           customerId,
           subscriptionId,
           sessionId: session.id,
-          metadata: session.metadata
+          metadata: session.metadata,
+          timestamp: new Date().toISOString()
         });
 
         try {
           // Get user from Supabase
+          console.log('Webhook: Fetching customer data from Supabase...');
           const { data: customerData, error: customerError } = await supabase
             .from('stripe_customers')
             .select('user_id')
@@ -64,10 +66,11 @@ Deno.serve(async (req) => {
             throw new Error('Customer not found');
           }
 
-          console.log('Found customer:', customerData);
+          console.log('Webhook: Customer data found:', customerData);
 
           // First update the subscription status
           if (subscriptionId) {
+            console.log('Webhook: Updating subscription status...');
             const { error: subscriptionError } = await supabase
               .from('stripe_subscriptions')
               .upsert({
@@ -83,10 +86,11 @@ Deno.serve(async (req) => {
               throw subscriptionError;
             }
 
-            console.log('Updated subscription status to active');
+            console.log('Webhook: Subscription status updated successfully');
           }
 
           // Then update user preferences with a more robust upsert
+          console.log('Webhook: Fetching existing preferences...');
           const { data: existingPrefs, error: fetchPrefsError } = await supabase
             .from('user_preferences')
             .select('*')
@@ -117,9 +121,11 @@ Deno.serve(async (req) => {
             throw preferencesError;
           }
 
-          console.log('Updated user preferences to Pro:', preferencesUpdate);
+          console.log('Webhook: Updating user preferences with:', preferencesUpdate);
+          console.log('Webhook: User preferences updated successfully');
 
           // Add payment record
+          console.log('Webhook: Recording payment...');
           const { error: paymentError } = await supabase
             .from('payment_history')
             .insert({
@@ -140,9 +146,10 @@ Deno.serve(async (req) => {
             throw paymentError;
           }
 
-          console.log('Added payment record');
+          console.log('Webhook: Payment recorded successfully');
 
           // Verify the update was successful
+          console.log('Webhook: Final verification of updates...');
           const { data: verifyPrefs, error: verifyError } = await supabase
             .from('user_preferences')
             .select('plan_tier')
@@ -154,11 +161,18 @@ Deno.serve(async (req) => {
             throw verifyError;
           }
 
-          console.log('Verified preferences update:', verifyPrefs);
+          console.log('Webhook: All updates verified successfully:', {
+            planTier: verifyPrefs.plan_tier,
+            timestamp: new Date().toISOString()
+          });
 
         } catch (error) {
-          console.error('Error processing checkout completion:', error);
-          // Re-throw to ensure the webhook returns an error status
+          console.error('Webhook Error: Failed to process checkout completion:', {
+            error,
+            customerId,
+            subscriptionId,
+            timestamp: new Date().toISOString()
+          });
           throw error;
         }
         break;
