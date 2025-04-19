@@ -164,6 +164,23 @@ export async function updateUserPreferences(preferences: Partial<UserPreferences
   return data as UserPreferences;
 }
 
+// Initialize user preferences
+export async function initializeUserPreferences(userId: string) {
+  const { data, error } = await supabase
+    .from('user_preferences')
+    .upsert({
+      user_id: userId,
+      currency: '₹',
+      locale: 'en-IN',
+      plan_tier: 'free'
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as UserPreferences;
+}
+
 // Real-time subscriptions
 export function subscribeToUserData(
   onTransactionsUpdate: () => void,

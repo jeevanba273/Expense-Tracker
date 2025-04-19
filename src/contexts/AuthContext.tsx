@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { clearUserData } from '../utils/storage';
+import { initializeUserPreferences } from '../utils/supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -20,11 +21,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         // Only set the user if their email is confirmed
         if (session.user.email_confirmed_at) {
-          setUser(session.user);
+          try {
+            // Initialize user preferences
+            await initializeUserPreferences(session.user.id);
+            setUser(session.user);
+          } catch (error) {
+            console.error('Error initializing user preferences:', error);
+            // Continue setting the user even if preferences fail
+            setUser(session.user);
+          }
         } else {
           // If email is not confirmed, sign them out
           supabase.auth.signOut();
@@ -43,8 +52,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (session?.user) {
         // Only set the user if their email is confirmed
         if (session.user.email_confirmed_at) {
-          setUser(session.user);
-          setShowAuthModal(false);
+          try {
+            // Initialize user preferences
+            await initializeUserPreferences(session.user.id);
+            setUser(session.user);
+            setShowAuthModal(false);
+          } catch (error) {
+            console.error('Error initializing user preferences:', error);
+            // Continue setting the user even if preferences fail
+            setUser(session.user);
+            setShowAuthModal(false);
+          }
         } else {
           // If email is not confirmed, sign them out
           await supabase.auth.signOut();

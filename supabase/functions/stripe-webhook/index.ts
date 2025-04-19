@@ -36,18 +36,36 @@ Deno.serve(async (req) => {
     
     if (!webhookSecret) {
       console.error('Webhook Error: STRIPE_WEBHOOK_SECRET is not set');
-      return new Response('Webhook secret not configured', { 
+      return new Response(JSON.stringify({ error: 'Webhook secret not configured' }), { 
         status: 500,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          ...corsHeaders 
+        }
       });
     }
 
-    console.log('Webhook: Verifying signature with secret:', webhookSecret.substring(0, 5) + '...');
-    
-    const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    console.log('Webhook: Signature verified successfully');
+    console.log('Webhook: Attempting to verify signature...');
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+      console.log('Webhook: Signature verified successfully');
+    } catch (err) {
+      console.error('Webhook: Signature verification failed:', err.message);
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), { 
+        status: 400,
+        headers: { 
+          'Content-Type': 'application/json',
+          ...corsHeaders 
+        }
+      });
+    }
 
-    console.log('Processing webhook event:', event.type);
+    console.log('Processing webhook event:', {
+      type: event.type,
+      id: event.id,
+      timestamp: new Date().toISOString()
+    });
 
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -62,7 +80,7 @@ Deno.serve(async (req) => {
           metadata: session.metadata,
           timestamp: new Date().toISOString(),
           paymentStatus: session.payment_status,
-          subscriptionStatus: session.subscription_status
+          mode: session.mode
         });
 
         try {

@@ -43,32 +43,46 @@ const SubscriptionPlans: React.FC = () => {
   useEffect(() => {
     const checkPreferences = async () => {
       try {
+        console.log('Refreshing preferences...');
         await refreshUserPreferences();
+        const currentPrefs = await fetchUserPreferences();
+        console.log('Current preferences:', currentPrefs);
+        
         // If preferences show pro and payment was completed, stop checking
-        if (userPreferences?.plan_tier === 'pro' && paymentCompleted) {
+        if (currentPrefs?.plan_tier === 'pro' && paymentCompleted) {
+          console.log('Pro plan detected, stopping refresh');
           setPaymentCompleted(false);
+          // Force a page reload to ensure all pro features are activated
+          window.location.reload();
         }
       } catch (error) {
         console.error('Error refreshing preferences:', error);
       }
     };
     
+    // Initial check
     checkPreferences();
     
-    // If payment was completed, check more frequently for a longer period
+    // If payment was completed, check more frequently
     if (paymentCompleted) {
-      const interval = setInterval(checkPreferences, 3000); // Check every 3 seconds
+      console.log('Payment completed, starting refresh interval');
+      const interval = setInterval(checkPreferences, 3000);
       const timeout = setTimeout(() => {
+        console.log('Refresh interval completed');
         clearInterval(interval);
         setPaymentCompleted(false);
-      }, 60000); // Keep checking for 60 seconds
+        // If we haven't detected pro plan after 60 seconds, show an error
+        if (userPreferences?.plan_tier !== 'pro') {
+          alert('Pro plan activation is taking longer than expected. Please contact support if this persists.');
+        }
+      }, 60000);
       
       return () => {
         clearInterval(interval);
         clearTimeout(timeout);
       };
     }
-  }, [paymentCompleted, userPreferences?.plan_tier]);
+  }, [paymentCompleted]);
   
   const plans = [
     {
