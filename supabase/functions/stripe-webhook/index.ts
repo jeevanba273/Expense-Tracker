@@ -23,13 +23,29 @@ Deno.serve(async (req) => {
   const signature = req.headers.get('stripe-signature');
 
   if (!signature) {
-    return new Response('No signature found', { status: 400 });
+    console.error('Webhook Error: No signature found in request headers');
+    return new Response('No signature found', { 
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
     const body = await req.text();
     const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
+    
+    if (!webhookSecret) {
+      console.error('Webhook Error: STRIPE_WEBHOOK_SECRET is not set');
+      return new Response('Webhook secret not configured', { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log('Webhook: Verifying signature with secret:', webhookSecret.substring(0, 5) + '...');
+    
     const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    console.log('Webhook: Signature verified successfully');
 
     console.log('Processing webhook event:', event.type);
 
@@ -44,7 +60,9 @@ Deno.serve(async (req) => {
           subscriptionId,
           sessionId: session.id,
           metadata: session.metadata,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          paymentStatus: session.payment_status,
+          subscriptionStatus: session.subscription_status
         });
 
         try {
@@ -57,16 +75,27 @@ Deno.serve(async (req) => {
             .single();
 
           if (customerError) {
-            console.error('Error fetching customer:', customerError);
+            console.error('Webhook Error: Failed to fetch customer:', {
+              error: customerError,
+              customerId,
+              timestamp: new Date().toISOString()
+            });
             throw customerError;
           }
 
           if (!customerData) {
-            console.error('No customer found for ID:', customerId);
+            console.error('Webhook Error: No customer found:', {
+              customerId,
+              timestamp: new Date().toISOString()
+            });
             throw new Error('Customer not found');
           }
 
-          console.log('Webhook: Customer data found:', customerData);
+          console.log('Webhook: Customer data found:', {
+            userId: customerData.user_id,
+            customerId,
+            timestamp: new Date().toISOString()
+          });
 
           // First update the subscription status
           if (subscriptionId) {
@@ -82,7 +111,12 @@ Deno.serve(async (req) => {
               });
 
             if (subscriptionError) {
-              console.error('Error updating subscription:', subscriptionError);
+              console.error('Webhook Error: Failed to update subscription:', {
+                error: subscriptionError,
+                customerId,
+                subscriptionId,
+                timestamp: new Date().toISOString()
+              });
               throw subscriptionError;
             }
 
@@ -98,7 +132,11 @@ Deno.serve(async (req) => {
             .single();
 
           if (fetchPrefsError && fetchPrefsError.code !== 'PGRST116') { // PGRST116 is "not found"
-            console.error('Error fetching existing preferences:', fetchPrefsError);
+            console.error('Webhook Error: Failed to fetch preferences:', {
+              error: fetchPrefsError,
+              userId: customerData.user_id,
+              timestamp: new Date().toISOString()
+            });
             throw fetchPrefsError;
           }
 
@@ -110,6 +148,8 @@ Deno.serve(async (req) => {
             ...(existingPrefs || {}) // Preserve existing preferences
           };
 
+          console.log('Webhook: Updating user preferences with:', preferencesUpdate);
+
           const { error: preferencesError } = await supabase
             .from('user_preferences')
             .upsert(preferencesUpdate, {
@@ -117,11 +157,14 @@ Deno.serve(async (req) => {
             });
 
           if (preferencesError) {
-            console.error('Error updating preferences:', preferencesError);
+            console.error('Webhook Error: Failed to update preferences:', {
+              error: preferencesError,
+              userId: customerData.user_id,
+              timestamp: new Date().toISOString()
+            });
             throw preferencesError;
           }
 
-          console.log('Webhook: Updating user preferences with:', preferencesUpdate);
           console.log('Webhook: User preferences updated successfully');
 
           // Add payment record
@@ -142,7 +185,11 @@ Deno.serve(async (req) => {
             });
 
           if (paymentError) {
-            console.error('Error recording payment:', paymentError);
+            console.error('Webhook Error: Failed to record payment:', {
+              error: paymentError,
+              userId: customerData.user_id,
+              timestamp: new Date().toISOString()
+            });
             throw paymentError;
           }
 
@@ -157,12 +204,17 @@ Deno.serve(async (req) => {
             .single();
 
           if (verifyError) {
-            console.error('Error verifying preferences update:', verifyError);
+            console.error('Webhook Error: Failed to verify preferences update:', {
+              error: verifyError,
+              userId: customerData.user_id,
+              timestamp: new Date().toISOString()
+            });
             throw verifyError;
           }
 
           console.log('Webhook: All updates verified successfully:', {
             planTier: verifyPrefs.plan_tier,
+            userId: customerData.user_id,
             timestamp: new Date().toISOString()
           });
 
