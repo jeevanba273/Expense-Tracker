@@ -6,7 +6,7 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 });
 
 const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') || '', 
+  Deno.env.get('SUPABASE_URL') || '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 );
 
@@ -67,17 +67,30 @@ Deno.serve(async (req) => {
         const session = event.data.object;
         const customerId = session.customer;
         const subscriptionId = session.subscription;
-        const userId = session.metadata?.user_id; // Get user_id from metadata
+        let userId = session.metadata?.user_id;
 
-        console.log('Checkout completed:', {
+        console.log('Checkout completed - Full session data:', {
+          id: session.id,
           customerId,
           subscriptionId,
-          sessionId: session.id,
-          userId
+          metadata: session.metadata,
+          customer: session.customer,
+          userId: userId,
+          mode: session.mode,
+          paymentStatus: session.payment_status
         });
 
         if (!userId) {
-          throw new Error('No user_id found in session metadata');
+          // Try to get user_id from customer metadata as fallback
+          const customer = await stripe.customers.retrieve(customerId);
+          console.log('Customer data:', customer);
+          
+          if (customer.metadata?.user_id) {
+            console.log('Found user_id in customer metadata:', customer.metadata.user_id);
+            userId = customer.metadata.user_id;
+          } else {
+            throw new Error('No user_id found in session metadata or customer metadata');
+          }
         }
 
         // Update user preferences to pro and store stripe IDs

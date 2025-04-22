@@ -16,7 +16,13 @@ serve(async (req) => {
   }
 
   try {
-    const { priceId, userId, email, metadata } = await req.json();
+    const { priceId, userId, email } = await req.json();
+
+    console.log('Creating checkout session with:', {
+      priceId,
+      userId,
+      email
+    });
 
     // Create or retrieve customer
     let customer;
@@ -24,19 +30,27 @@ serve(async (req) => {
     
     if (existingCustomers.data.length > 0) {
       customer = existingCustomers.data[0];
+      console.log('Updating existing customer:', customer.id);
       // Update customer metadata
       await stripe.customers.update(customer.id, {
         metadata: { user_id: userId }
       });
     } else {
+      console.log('Creating new customer');
       customer = await stripe.customers.create({
         email,
         metadata: { user_id: userId }
       });
     }
 
+    console.log('Customer:', {
+      id: customer.id,
+      email: customer.email,
+      metadata: customer.metadata
+    });
+
     // Create checkout session
-    const session = await stripe.checkout.sessions.create({
+    const sessionData = {
       customer: customer.id,
       line_items: [
         {
@@ -53,9 +67,17 @@ serve(async (req) => {
         name: 'auto',
       },
       metadata: {
-        user_id: userId,  // Add metadata to session
-        ...metadata
+        user_id: userId  // Add user_id to session metadata
       }
+    };
+
+    console.log('Creating session with:', sessionData);
+    
+    const session = await stripe.checkout.sessions.create(sessionData);
+
+    console.log('Session created:', {
+      id: session.id,
+      metadata: session.metadata
     });
 
     return new Response(
