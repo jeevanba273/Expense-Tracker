@@ -59,7 +59,7 @@ serve(async (req) => {
         },
       ],
       mode: 'subscription',
-      success_url: `${req.headers.get('origin')}/settings?success=true`,
+      success_url: `${req.headers.get('origin')}/settings?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get('origin')}/settings?canceled=true`,
       billing_address_collection: 'required',
       customer_update: {
@@ -71,7 +71,12 @@ serve(async (req) => {
       }
     };
 
-    console.log('Creating session with:', sessionData);
+    console.log('Creating session with:', {
+      ...sessionData,
+      origin: req.headers.get('origin'),
+      success_url: sessionData.success_url,
+      cancel_url: sessionData.cancel_url
+    });
     
     const session = await stripe.checkout.sessions.create(sessionData);
 
