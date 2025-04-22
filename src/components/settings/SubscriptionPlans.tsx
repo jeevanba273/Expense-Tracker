@@ -31,8 +31,12 @@ const SubscriptionPlans: React.FC = () => {
   // Check for payment completion in URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
     const sessionId = urlParams.get('session_id');
-    if (sessionId) {
+    console.log('URL Params:', { success, sessionId });
+    
+    if (success === 'true') {
+      console.log('Payment marked as successful');
       setPaymentCompleted(true);
       // Clear the URL parameters
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -43,17 +47,19 @@ const SubscriptionPlans: React.FC = () => {
   useEffect(() => {
     const checkPreferences = async () => {
       try {
-        console.log('Refreshing preferences...');
+        console.log('Checking preferences, paymentCompleted:', paymentCompleted);
         await refreshUserPreferences();
         const currentPrefs = await fetchUserPreferences();
-        console.log('Current preferences:', currentPrefs);
+        console.log('Current preferences after refresh:', currentPrefs);
         
-        // If preferences show pro and payment was completed, stop checking
-        if (currentPrefs?.plan_tier === 'pro' && paymentCompleted) {
-          console.log('Pro plan detected, stopping refresh');
+        // If preferences show pro, stop checking
+        if (currentPrefs?.planTier === 'pro') {
+          console.log('Pro plan confirmed, reloading page');
           setPaymentCompleted(false);
           // Force a page reload to ensure all pro features are activated
           window.location.reload();
+        } else {
+          console.log('Plan tier not pro yet:', currentPrefs?.planTier);
         }
       } catch (error) {
         console.error('Error refreshing preferences:', error);
@@ -65,15 +71,16 @@ const SubscriptionPlans: React.FC = () => {
     
     // If payment was completed, check more frequently
     if (paymentCompleted) {
-      console.log('Payment completed, starting refresh interval');
+      console.log('Starting preference refresh interval');
       const interval = setInterval(checkPreferences, 3000);
       const timeout = setTimeout(() => {
         console.log('Refresh interval completed');
         clearInterval(interval);
         setPaymentCompleted(false);
         // If we haven't detected pro plan after 60 seconds, show an error
-        if (userPreferences?.plan_tier !== 'pro') {
-          alert('Pro plan activation is taking longer than expected. Please contact support if this persists.');
+        if (userPreferences?.planTier !== 'pro') {
+          console.log('Pro plan not detected after timeout');
+          alert('Pro plan activation is taking longer than expected. Please try refreshing the page.');
         }
       }, 60000);
       

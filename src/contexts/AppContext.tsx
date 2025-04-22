@@ -57,13 +57,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [userPreferences, setUserPreferences] = useState<UserPreferences>(defaultUserPreferences);
 
   const refreshUserPreferences = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('No user, skipping preference refresh');
+      return;
+    }
     try {
-      console.log('Refreshing user preferences...');
+      console.log('Refreshing user preferences for user:', user.id);
       const prefs = await fetchUserPreferences();
+      console.log('Fetched preferences:', prefs);
+      
       if (prefs) {
-        console.log('New preferences fetched:', prefs);
-        setUserPreferences(prefs);
+        // Check if preferences actually changed before updating state
+        const prefsChanged = JSON.stringify(prefs) !== JSON.stringify(userPreferences);
+        console.log('Preferences changed:', prefsChanged);
+        
+        if (prefsChanged) {
+          console.log('Updating preferences in state:', prefs);
+          setUserPreferences(prefs);
+        } else {
+          console.log('Preferences unchanged, skipping update');
+        }
       } else {
         console.log('No preferences found, using defaults');
         setUserPreferences(defaultUserPreferences);
