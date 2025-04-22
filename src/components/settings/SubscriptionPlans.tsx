@@ -166,6 +166,9 @@ const SubscriptionPlans: React.FC = () => {
             priceId: plan.priceId,
             userId: user.id,
             email: user.email,
+            metadata: {
+              user_id: user.id
+            }
           }),
         }
       );

@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { priceId, userId, email } = await req.json();
+    const { priceId, userId, email, metadata } = await req.json();
 
     // Create or retrieve customer
     let customer;
@@ -24,12 +24,14 @@ serve(async (req) => {
     
     if (existingCustomers.data.length > 0) {
       customer = existingCustomers.data[0];
+      // Update customer metadata
+      await stripe.customers.update(customer.id, {
+        metadata: { user_id: userId }
+      });
     } else {
       customer = await stripe.customers.create({
         email,
-        metadata: {
-          user_id: userId
-        }
+        metadata: { user_id: userId }
       });
     }
 
@@ -49,6 +51,10 @@ serve(async (req) => {
       customer_update: {
         address: 'auto',
         name: 'auto',
+      },
+      metadata: {
+        user_id: userId,  // Add metadata to session
+        ...metadata
       }
     });
 
