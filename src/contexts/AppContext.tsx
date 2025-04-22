@@ -161,16 +161,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (!user) return;
 
+    console.log('Setting up real-time subscriptions for user:', user.id);
+    
     const unsubscribe = subscribeToUserData(
-      () => fetchTransactions().then(data => setTransactions(data)),
-      () => fetchCategories().then(data => setCategories(data)),
-      () => fetchBudgets().then(data => setBudgets(data)),
-      () => fetchUserPreferences().then(prefs => {
-        if (prefs) setUserPreferences(prefs);
-      })
+      () => {
+        console.log('Real-time transaction update received');
+        fetchTransactions().then(data => setTransactions(data));
+      },
+      () => {
+        console.log('Real-time category update received');
+        fetchCategories().then(data => setCategories(data));
+      },
+      () => {
+        console.log('Real-time budget update received');
+        fetchBudgets().then(data => setBudgets(data));
+      },
+      () => {
+        console.log('Real-time preferences update received');
+        fetchUserPreferences().then(prefs => {
+          if (prefs) {
+            console.log('New preferences received:', prefs);
+            setUserPreferences(prefs);
+          }
+        });
+      }
     );
 
     return () => {
+      console.log('Cleaning up real-time subscriptions');
       if (typeof unsubscribe === 'function') {
         unsubscribe();
       }
@@ -217,8 +235,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateUserPreferences = async (preferences: Partial<UserPreferences>) => {
     if (!user) return;
-    const updatedPreferences = await updateSupabasePreferences(preferences);
-    setUserPreferences(updatedPreferences);
+    console.log('Updating user preferences:', preferences);
+    try {
+      const updatedPreferences = await updateSupabasePreferences(preferences);
+      console.log('Preferences updated successfully:', updatedPreferences);
+      setUserPreferences(updatedPreferences);
+    } catch (error) {
+      console.error('Error updating preferences:', error);
+      throw error;
+    }
   };
 
   const getTransactionsByCategory = () => {

@@ -32,22 +32,48 @@ const SubscriptionPlans: React.FC = () => {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const success = urlParams.get('success');
-    const sessionId = urlParams.get('session_id');
-    console.log('URL Params:', { success, sessionId });
+    const canceled = urlParams.get('canceled');
+    
+    console.log('Payment redirect detected. URL parameters:', {
+      success,
+      canceled,
+      fullUrl: window.location.href
+    });
     
     if (success === 'true') {
-      console.log('Payment marked as successful');
+      console.log('Payment success detected, initiating preference refresh');
       setPaymentCompleted(true);
+      
+      // Immediately check preferences
+      const immediateCheck = async () => {
+        try {
+          console.log('Performing immediate preference check');
+          await refreshUserPreferences();
+          const currentPrefs = await fetchUserPreferences();
+          console.log('Immediate preference check result:', currentPrefs);
+        } catch (error) {
+          console.error('Error in immediate preference check:', error);
+        }
+      };
+      immediateCheck();
+      
       // Clear the URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (canceled === 'true') {
+      console.log('Payment was canceled');
+      alert('Payment was canceled. Please try again if you want to upgrade to Pro.');
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
   // Refresh user preferences when component mounts, after payment completion, and periodically
   useEffect(() => {
+    let checkCount = 0;
+    const MAX_CHECKS = 20; // 20 checks * 3 seconds = 60 seconds total
+
     const checkPreferences = async () => {
       try {
-        console.log('Checking preferences, paymentCompleted:', paymentCompleted);
+        console.log(`Checking preferences (attempt ${checkCount + 1}/${MAX_CHECKS}), paymentCompleted:`, paymentCompleted);
         await refreshUserPreferences();
         const currentPrefs = await fetchUserPreferences();
         console.log('Current preferences after refresh:', currentPrefs);
@@ -58,11 +84,14 @@ const SubscriptionPlans: React.FC = () => {
           setPaymentCompleted(false);
           // Force a page reload to ensure all pro features are activated
           window.location.reload();
+          return true;
         } else {
           console.log('Plan tier not pro yet:', currentPrefs?.planTier);
+          return false;
         }
       } catch (error) {
         console.error('Error refreshing preferences:', error);
+        return false;
       }
     };
     
@@ -70,25 +99,28 @@ const SubscriptionPlans: React.FC = () => {
     checkPreferences();
     
     // If payment was completed, check more frequently
+    let interval: NodeJS.Timeout | null = null;
     if (paymentCompleted) {
       console.log('Starting preference refresh interval');
-      const interval = setInterval(checkPreferences, 3000);
-      const timeout = setTimeout(() => {
-        console.log('Refresh interval completed');
-        clearInterval(interval);
-        setPaymentCompleted(false);
-        // If we haven't detected pro plan after 60 seconds, show an error
-        if (userPreferences?.planTier !== 'pro') {
-          console.log('Pro plan not detected after timeout');
-          alert('Pro plan activation is taking longer than expected. Please try refreshing the page.');
+      interval = setInterval(async () => {
+        checkCount++;
+        const success = await checkPreferences();
+        
+        if (success || checkCount >= MAX_CHECKS) {
+          if (interval) clearInterval(interval);
+          setPaymentCompleted(false);
+          
+          if (!success && checkCount >= MAX_CHECKS) {
+            console.log('Max checks reached without detecting pro plan');
+            alert('Pro plan activation is taking longer than expected. Please refresh the page or contact support if the issue persists.');
+          }
         }
-      }, 60000);
-      
-      return () => {
-        clearInterval(interval);
-        clearTimeout(timeout);
-      };
+      }, 3000);
     }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [paymentCompleted]);
   
   const plans = [
