@@ -155,7 +155,7 @@ const SubscriptionPlans: React.FC = () => {
       if (!plan?.priceId) throw new Error('Invalid plan');
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout`,
+        'https://expense-tracker-advanced-analytics.up.railway.app/functions/v1/create-checkout',
         {
           method: 'POST',
           headers: {
@@ -192,8 +192,8 @@ const SubscriptionPlans: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-portal`,
+      const portalResponse = await fetch(
+        'https://expense-tracker-advanced-analytics.up.railway.app/functions/v1/create-portal',
         {
           method: 'POST',
           headers: {
@@ -206,11 +206,11 @@ const SubscriptionPlans: React.FC = () => {
         }
       );
 
-      if (!response.ok) {
+      if (!portalResponse.ok) {
         throw new Error('Failed to create portal session');
       }
 
-      const { url } = await response.json();
+      const { url } = await portalResponse.json();
       if (url) {
         window.location.href = url;
       }
