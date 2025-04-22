@@ -32,7 +32,7 @@ const PaymentHistory: React.FC = () => {
   const downloadInvoice = async (paymentIntentId: string) => {
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-history`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-invoice`,
         {
           method: 'POST',
           headers: {
