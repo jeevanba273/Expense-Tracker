@@ -155,7 +155,7 @@ const SubscriptionPlans: React.FC = () => {
       if (!plan?.priceId) throw new Error('Invalid plan');
 
       const response = await fetch(
-        'https://expense-tracker-advanced-analytics.up.railway.app/functions/v1/create-checkout',
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout`,
         {
           method: 'POST',
           headers: {
@@ -193,7 +193,7 @@ const SubscriptionPlans: React.FC = () => {
     setLoading(true);
     try {
       const portalResponse = await fetch(
-        'https://expense-tracker-advanced-analytics.up.railway.app/functions/v1/create-portal',
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-portal`,
         {
           method: 'POST',
           headers: {

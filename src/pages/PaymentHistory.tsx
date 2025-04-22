@@ -32,7 +32,7 @@ const PaymentHistory: React.FC = () => {
   const downloadInvoice = async (paymentIntentId: string) => {
     try {
       const response = await fetch(
-        'https://expense-tracker-advanced-analytics.up.railway.app/functions/v1/payment-history',
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-history`,
         {
           method: 'POST',
           headers: {
